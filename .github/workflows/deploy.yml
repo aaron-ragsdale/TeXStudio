@@ -1,0 +1,69 @@
+name: Deploy TeXStudio
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: TeXlyre/texlyre
+          ref: 6bf1f23b31997a9c6183f3700bb38d18d39bc23e
+          persist-credentials: false
+          submodules: recursive
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Configure TeXStudio
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('texlyre.config.ts')
+          s = p.read_text()
+          changes = {
+              "title: 'TeXlyre'": "title: 'TeXStudio'",
+              "url: 'https://texlyre.org'": "url: 'https://aaron-ragsdale.github.io'",
+              "baseUrl: '/texlyre/'": "baseUrl: '/TeXStudio/'",
+              "organizationName: 'texlyre'": "organizationName: 'aaron-ragsdale'",
+              "projectName: 'texlyre'": "projectName: 'TeXStudio'",
+              "'texlyre.github.io',": "'aaron-ragsdale.github.io',\n            'texlyre.github.io',",
+          }
+          for a, b in changes.items():
+              assert a in s, a
+              s = s.replace(a, b, 1)
+          p.write_text(s)
+          PY
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run generate:userdata-interfaces
+      - run: pnpm run generate:configs
+      - run: pnpm run build:local
+      - name: Preserve source attribution
+        run: |
+          cp LICENSE* dist/
+          printf '%s\n' 'TeXStudio is based on TeXlyre (AGPL-3.0-or-later).' 'Source: https://github.com/aaron-ragsdale/TeXStudio' 'Upstream: https://github.com/TeXlyre/texlyre/tree/6bf1f23b31997a9c6183f3700bb38d18d39bc23e' > dist/SOURCE.txt
+          touch dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
