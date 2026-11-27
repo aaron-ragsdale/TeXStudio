@@ -69,64 +69,64 @@ jobs:
           start = s.index('\t\t\t\t\t\tif (this.isGuestUser(user) && this.isGuestExpired(user)) {')
           end = s.index('\n\t\t\t\t\t} else {', start)
           s = s[:start] + """						// Preserve the existing project's owner ID when converting a legacy guest.
-						if (this.isGuestUser(user)) {
-							const localUser: User = {
-								...user,
-								username: 'Local Workspace',
-								isGuest: false,
-								isLocalWorkspace: true,
-								sessionId: undefined,
-								expiresAt: undefined,
-							};
-							await this.db.put(this.USER_STORE, localUser);
-							this.currentUser = localUser;
-						} else {
-							this.currentUser = user;
-						}""" + s[end:]
+          						if (this.isGuestUser(user)) {
+          							const localUser: User = {
+          								...user,
+          								username: 'Local Workspace',
+          								isGuest: false,
+          								isLocalWorkspace: true,
+          								sessionId: undefined,
+          								expiresAt: undefined,
+          							};
+          							await this.db.put(this.USER_STORE, localUser);
+          							this.currentUser = localUser;
+          						} else {
+          							this.currentUser = user;
+          						}""" + s[end:]
           old = '\t\t\t// Run cleanup on initialization\n\t\t\tthis.cleanupExpiredGuests();'
           assert old in s
           s = s.replace(old, """			// Default to the persistent workspace; an explicit sign-out opens profile selection.
-			if (!this.currentUser && localStorage.getItem('texstudio-profile-picker') !== 'true') {
-				await this.openLocalWorkspace();
-			}
-			// Do not automatically delete legacy guest projects on startup.""", 1)
+          			if (!this.currentUser && localStorage.getItem('texstudio-profile-picker') !== 'true') {
+          				await this.openLocalWorkspace();
+          			}
+          			// Do not automatically delete legacy guest projects on startup.""", 1)
           start = s.index('\tasync createGuestAccount(): Promise<User> {')
           end = s.index('\n\tasync upgradeGuestAccount(', start)
           s = s[:start] + """	// Kept for compatibility with the upstream authentication context.
-	async createGuestAccount(): Promise<User> {
-		if (!this.db) await this.initialize();
-		return this.openLocalWorkspace();
-	}
+          	async createGuestAccount(): Promise<User> {
+          		if (!this.db) await this.initialize();
+          		return this.openLocalWorkspace();
+          	}
 
-	private async openLocalWorkspace(): Promise<User> {
-		const db = this.db;
-		if (!db) throw new Error('Local database is not available');
-		const passwordHash = await this.hashPassword(crypto.randomUUID());
-		// A read-write transaction prevents duplicate workspaces from simultaneous tabs.
-		const tx = db.transaction(this.USER_STORE, 'readwrite');
-		const store = tx.objectStore(this.USER_STORE);
-		const users: User[] = await store.getAll();
-		let user = users.find((item) => item.isLocalWorkspace && !item.isGuest);
-		if (!user) {
-			const now = Date.now();
-			user = {
-				id: crypto.randomUUID(),
-				username: 'Local Workspace',
-				passwordHash,
-				isLocalWorkspace: true,
-				createdAt: now,
-				lastLogin: now,
-				color: generateRandomColor(false),
-				colorLight: generateRandomColor(true),
-			};
-			await store.put(user);
-		}
-		await tx.done;
-		this.currentUser = user;
-		localStorage.setItem('texlyre-current-user', user.id);
-		localStorage.removeItem('texstudio-profile-picker');
-		return user;
-	}
+          	private async openLocalWorkspace(): Promise<User> {
+          		const db = this.db;
+          		if (!db) throw new Error('Local database is not available');
+          		const passwordHash = await this.hashPassword(crypto.randomUUID());
+          		// A read-write transaction prevents duplicate workspaces from simultaneous tabs.
+          		const tx = db.transaction(this.USER_STORE, 'readwrite');
+          		const store = tx.objectStore(this.USER_STORE);
+          		const users: User[] = await store.getAll();
+          		let user = users.find((item) => item.isLocalWorkspace && !item.isGuest);
+          		if (!user) {
+          			const now = Date.now();
+          			user = {
+          				id: crypto.randomUUID(),
+          				username: 'Local Workspace',
+          				passwordHash,
+          				isLocalWorkspace: true,
+          				createdAt: now,
+          				lastLogin: now,
+          				color: generateRandomColor(false),
+          				colorLight: generateRandomColor(true),
+          			};
+          			await store.put(user);
+          		}
+          		await tx.done;
+          		this.currentUser = user;
+          		localStorage.setItem('texlyre-current-user', user.id);
+          		localStorage.removeItem('texstudio-profile-picker');
+          		return user;
+          	}
 """ + s[end:]
           old = "\t\tlocalStorage.removeItem('texlyre-current-user');\n\n\t\tif (!user) return;"
           assert s.count(old) == 1
