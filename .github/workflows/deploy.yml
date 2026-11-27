@@ -13,25 +13,16 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: upstream
     steps:
       - uses: actions/checkout@v4
         with:
-          path: .texstudio
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
           repository: TeXlyre/texlyre
-          path: upstream
           ref: 6bf1f23b31997a9c6183f3700bb38d18d39bc23e
           persist-credentials: false
           submodules: recursive
       - uses: pnpm/action-setup@v4
         with:
           version: 10.20.0
-          package_json_file: upstream/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -57,8 +48,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install missing upstream TypeScript declarations
         run: pnpm add -D --save-exact @types/mdast@4.0.4 @types/lodash@4.17.20
-      - name: Enable persistent account-free workspace
-        run: python3 ../.texstudio/scripts/local-workspace.py
       - run: pnpm run generate:userdata-interfaces
       - run: pnpm run generate:configs
       - run: pnpm run build:local
@@ -69,7 +58,7 @@ jobs:
           touch dist/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: upstream/dist
+          path: dist
   deploy:
     needs: build
     runs-on: ubuntu-latest
